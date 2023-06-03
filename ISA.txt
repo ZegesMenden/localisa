@@ -1,0 +1,28 @@
+ISA
+
+16 bit instructions
+
+4 bit opcode (MSB)
+8 registers (r0..r7)
+128 bytes of memory (64x16)
+
+instructions:
+
+opcode subcode	name	parameters		description
+0b0000  0b000	ADD 	ra rb 	rc 		-> ra = rb+rc
+0b0000  0b001	ADC 	ra rb 	rc 		-> ra = rb+rc+c
+0b0000  0b010	SUB 	ra rb 	rc 		-> ra = rb-rc
+0b0000  0b011	SUBC 	ra rb 	rc 		-> ra = rb-rc-c
+0b0000  0b100	NAND 	ra rb 	rc 		-> ra = !(rb&rc)
+0b0000  0b101	AND 	ra rb 	rc 		-> ra = rb&rc
+0b0000  0b110	OR 		ra rb 	rc 		-> ra = rb|rc
+0b0000  0b111	XOR     ra rb   rc      -> ra = rb^rc
+0b0001   N/A 	ADDI 	ra rb 	imm 	-> ra = rb+imm
+0b0010	 N/A 	BS 		ra rb 	imm 	-> imm>=32 ? ra = rb<<imm : ra = rb>>imm 
+0b0011	 N/A 	SW 		ra rb 	imm 	-> mem[rb+imm] = ra
+0b0100	 N/A 	LW 		ra rb 	imm 	-> ra = mem[rb+imm]
+0b0101	 N/A 	CMP 	ra rb 			-> compare ra and rb and update status register
+0b0110	 N/A 	JALR 	ra rb 			-> set PC to rb and store PC+1 in ra
+0b0111	 N/A 	BEQ 	ra rb   imm 	-> set PC to rb + imm and store PC+1 in ra if EQ flag is set
+0b1000	 N/A 	BGR		ra rb   imm 	-> set PC to rb + imm and store PC+1 in ra if GR flag is set
+0b1110	 N/A 	LUI 	ra imm 			-> ra = imm<<6 this instruction is special because it only uses 3 bits in order to fit a 10 bit immediate. the format is 0b111|reg|imm|
