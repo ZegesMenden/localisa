@@ -36,6 +36,8 @@ uint16_t memory[MEMORY_SIZE] = {0};
 uint16_t PC = 0;
 uint16_t instruction = 0;
 
+uint64_t systick = 0;
+
 // ===========================================================================
 // typedefs
 
@@ -49,6 +51,7 @@ typedef enum opcode {
 	JALR = 0b0110,
 	BEQ  = 0b0111,
 	BGR	 = 0b1000,
+	MOV  = 0b1001,
 	LUI  = 0b1110
 } opcode;
 
@@ -110,8 +113,18 @@ void __error_handler(const char * fun_name, char * msg) {
 
 #define fatal_error(msg) __fatal_error_handler(__FUNCTION__, msg)
 #define error(msg) __error_handler(__FUNCTION__, msg)
+#define debugprintf(c, ...) //printf(c, __VA_ARGS__)
 
-#define debugprintf(c, ...) printf(c, __VA_ARGS__)
+void debug_function_diagnostics(const char * fun_name) {
+	debugprintf("current operation: %s\n", fun_name);
+	debugprintf("current PC: 0x%04x\n", PC, PC);
+	
+	// register dump
+	debugprintf("\nregisters:\n", NULL);
+	for ( int i = 0; i < 3; i++ ) {	debugprintf("r%i: 0x%04x\n", i, registers[i]); }
+	debugprintf("\n", NULL);
+	debugprintf("===========================================================================\n", NULL);
+}
 
 // ===========================================================================
 // file interface
@@ -120,11 +133,11 @@ uint16_t fetch_next_instruction(FILE *fptr) {
 
 	uint16_t ret;
 
-	if ( fseek(fptr, PC, SEEK_SET) != 0 ) { 
-		fatal_error("invalid PC"); 
-	}
-	
-	fread(&ret, sizeof(ret), 1, fptr);
+	if ( fseek(fptr, PC*2, SEEK_SET) != 0 ) { fatal_error("invalid PC"); }
+	if ( fread(&ret, sizeof(ret), 1, fptr) != 1 ) { fatal_error("invalid PC"); }
+
+	ret = (ret&0xff)<<8 | (ret>>8);
+
 	return ret;
 
 }
@@ -136,34 +149,42 @@ void update_alu(alu_subcode operation, int ra, int rb, int rc) {
 
 	switch (operation) {
 		case(ADD): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]+registers[rc];
 			break;
 		}
 		case(ADC): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]+registers[rc]+carry;
 			break;
 		}
 		case(SUB): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]-registers[rc];
 			break;
 		}
 		case(SUBC): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]-registers[rc]-carry;
 			break;
 		}
 		case(NAND): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = !(registers[rb]&registers[rc]);
 			break;
 		}
 		case(AND): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]&registers[rc];
 			break;
 		}
 		case(OR): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]|registers[rc];
 			break;
 		}
 		case(XOR): {
+			debug_function_diagnostics(__FUNCTION__);
 			registers[ra] = registers[rb]^registers[rc];
 			break;
 		}
@@ -175,17 +196,18 @@ void update_alu(alu_subcode operation, int ra, int rb, int rc) {
 }
 
 void add_immediate(int ra, int rb, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 	registers[ra] = registers[rb]+imm;
 }
-
 void bit_shift(int ra, int rb, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 
 	// if bit 4 is set (shift left)
 	if ( (imm>>4)&1 == 1 ) {
 
 		// if bit 5 is set (shift from register)
-		if ( (imm>>5)&1 == 1 ) { registers[ra] = registers[rb]>>registers[(imm&7)]; }
-		else { registers[ra] = registers[rb]>>(imm&0xf); }
+		if ( (imm>>5)&1 == 1 ) { registers[ra] = registers[rb]<<registers[(imm&7)]; }
+		else { registers[ra] = registers[rb]<<(imm&0xf); }
 
 	} else {
 
@@ -195,48 +217,52 @@ void bit_shift(int ra, int rb, int imm) {
 
 	}
 }
-
 void load_word(int ra, int rb, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 	uint16_t memory_position = registers[rb]+imm;
 	if ( memory_position >= MEMORY_SIZE ) { fatal_error("invalid memory access"); }
 	registers[ra] = memory[memory_position];
 };
-
 void store_word(int ra, int rb, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 	uint16_t memory_position = registers[rb]+imm;
 	if ( memory_position >= MEMORY_SIZE ) { fatal_error("invalid memory access"); }
 	memory[memory_position] = registers[ra];
 };
-
 void compare(int ra, int rb) {
+	debug_function_diagnostics(__FUNCTION__);
 	flag_beq = registers[ra] == registers[rb];
 	flag_bgr = registers[ra] > registers[rb];
 }
-
 void jump_and_link_register(int ra, int rb) {
+	debug_function_diagnostics(__FUNCTION__);
 	registers[ra] = PC;
 	PC = registers[rb];
 }
-
 void branch_if_equal(int ra, int rb, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 	if ( flag_beq ) {
 		registers[ra] = PC;
 		PC = registers[rb]+imm;
 	}
 }
-
 void branch_if_greater(int ra, int rb, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 	if ( flag_bgr ) {
 		registers[ra] = PC;
 		PC = registers[rb]+imm;
 	}
 }
-
+void move(int ra, int rb) {
+	debug_function_diagnostics(__FUNCTION__);
+	registers[ra] = registers[rb];
+}
 void load_upper_immediate(int ra, int imm) {
+	debug_function_diagnostics(__FUNCTION__);
 	registers[ra] = imm<<6;
 }
-
 // ===========================================================================
+
 // update function
 
 int cpu_tick(void) {
@@ -251,8 +277,8 @@ int cpu_tick(void) {
 	// special processing for LUI due to a shorter instruction
 	if ( code == 0b1110 || code == 0b1111 ) {
 		
-		int ra = (code&0x1c00)>>10;
-		int imm = (code&0x03ff);
+		int ra = (instruction&0x1c00)>>10;
+		int imm = (instruction&0x03ff);
 		load_upper_immediate(ra, imm);
 
 		return 1;
@@ -302,6 +328,10 @@ int cpu_tick(void) {
 		case(BGR): {
 			branch_if_greater(ra, rb, imm);
 			break;
+		}	
+		case(MOV): {
+			move(ra, rb);
+			break;
 		}	 
 		default: {
 			if ( code != LUI ) { error("unrecognized cpu instruction"); }
@@ -328,23 +358,9 @@ int main(int argc, char *argv[]) {
 
 	printf("starting emulation..\n");
 
-	while(cpu_tick()) {
-
-		printf("current PC: 0x%04x\n\n", PC, PC);
-	
-		// register dump
-		// printf("\nregisters:\n");
-		// for ( int i = 0; i < 8; i++ ) {	printf("r%i: 0x%04x\n", i, registers[i]); }
-
-		// // mem dump
-		// printf("\nmemory:\n");
-		// for ( int i = 0; i < 8; i++ ) {
-		// 	for ( int j = 0; j < 8; j++ ) { printf("%04x, ", memory[i*8+j]); } 
-		// 	printf("\n");
-		// }
-
-		if ( PC > 2 ) { break; }
-
+	while(cpu_tick()) { 
+		systick++;
+		// if ( systick > 10 ) { break; }
 	}
 
 	printf("ending emulation\n");
