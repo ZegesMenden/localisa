@@ -25,4 +25,5 @@ opcode subcode	name	parameters		description
 0b0110	 N/A 	JALR 	ra rb 			-> set PC to rb and store PC+1 in ra
 0b0111	 N/A 	BEQ 	ra rb   imm 	-> set PC to rb + imm and store PC+1 in ra if EQ flag is set
 0b1000	 N/A 	BGR		ra rb   imm 	-> set PC to rb + imm and store PC+1 in ra if GR flag is set
+0b1001	 N/A 	MOV		ra rb       	-> copy the value in rb to ra
 0b1110	 N/A 	LUI 	ra imm 			-> ra = imm<<6 this instruction is special because it only uses 3 bits in order to fit a 10 bit immediate. the format is 0b111|reg|imm|
